@@ -507,20 +507,3 @@ class Timeseries:
             result[col] = compound_return
 
         return result
-    
-    def correlation(self, use_log_returns=False):
-        """
-        Calculates the correlation between the returns of the time series data.
-
-        Parameters
-        ----------
-        use_log_returns : bool, optional
-            If True, the correlation between the log returns is calculated. Defaults to False.
-
-        Returns
-        -------
-        pandas.DataFrame
-            A DataFrame representing the correlation matrix between the returns of the time series data.
-        """
-        returns = self.log_returns() if use_log_returns else self.returns()
-        return returns.corr()
