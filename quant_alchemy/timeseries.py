@@ -206,7 +206,7 @@ class Timeseries:
         max_drawdowns = {}
 
         for col, df in drawdown.items():
-            max_drawdowns[col] = df['Drawdown'].min()
+            max_drawdowns[col] = df['drawdowns'].min()
 
         return pd.Series(max_drawdowns)
     
@@ -230,10 +230,10 @@ class Timeseries:
 
         return {
             col: pd.DataFrame({
-                'Returns': return_series[col],
-                'Cumulative Returns': cumulative_returns[col],
-                'Running Max': running_max[col],
-                'Drawdowns': drawdown[col]
+                'returns': return_series[col],
+                'cumulative_returns': cumulative_returns[col],
+                'running_max': running_max[col],
+                'drawdowns': drawdown[col]
             })
             for col in return_series.columns
         }
@@ -496,13 +496,13 @@ class Timeseries:
         result = {}
 
         returns = self.returns()
-        returns["Year"] = returns.index.year
-        returns["Month"] = returns.index.month
+        returns["year"] = returns.index.year
+        returns["month"] = returns.index.month
 
         # -2 because we don't want to include the Year and Month columns
         for col in returns.columns[:-2]:
-            compound_return = returns.groupby(["Year", "Month"])[col].apply(calculate_compound_return).reset_index()
-            compound_return.columns = ["Year", "Month", "Compound Return"]
+            compound_return = returns.groupby(["year", "month"])[col].apply(calculate_compound_return).reset_index()
+            compound_return.columns = ["year", "month", "compound_return"]
 
             result[col] = compound_return
 
