@@ -38,31 +38,52 @@ class Timeseries:
             prices = pd.DataFrame(prices)
 
         return prices
-
-    def returns(self):
+    
+    @property
+    def columns(self):
         """
-        Calculates the simple returns of the time series data.
+        Returns the column names of the time series data.
 
         Returns
         -------
-        pandas.Series or pandas.DataFrame
-            The simple returns of the time series data, excluding the first datapoint.
+        list
+            The column names of the time series data.
         """
 
-        returns = self.prices.pct_change().dropna()
-        return returns
-
-    def log_returns(self):
+        return self.prices.columns.tolist()
+    
+    @property
+    def shape(self):
         """
-        Calculates the logarithmic returns of the time series data.
+        Returns the shape of the time series data.
 
         Returns
         -------
-        pandas.Series or pandas.DataFrame
-            The logarithmic returns of the time series data, excluding the first datapoint.
+        tuple
+            The shape of the time series data.
         """
 
-        return np.log(self.prices / self.prices.shift(1)).dropna()
+        return self.prices.shape
+
+    def returns(self, use_log_returns=False):
+        """
+        Calculates the returns of the time series data.
+
+        Parameters
+        ----------
+        use_log_returns : bool, optional
+            Whether to calculate log returns (default is False).
+
+        Returns
+        -------
+        pandas.DataFrame
+            The returns of the time series data.
+        """
+
+        if use_log_returns:
+            return np.log(self.prices / self.prices.shift(1)).dropna()
+            
+        return self.prices.pct_change().dropna()
 
     def volatility(self):
         """
@@ -73,8 +94,8 @@ class Timeseries:
         float
             The volatility of the returns of the time series data. Degrees of freedom = 1.
         """
-
-        return self.prices.pct_change().std(ddof=1)
+        returns = self.returns()
+        return returns.std(ddof=1)
     
     def periods_in_year(self, period, trading_days=252, hours_per_day=8):
         """
@@ -104,21 +125,21 @@ class Timeseries:
             raise ValueError('Invalid number of trading hours. Please choose 8 (for traditional markets) or 24 (for cryptocurrencies and forex)')
 
         return {
-            'annually': 1,
-            'semi-annually': 2,
-            'quarterly': 4,
-            'monthly': 12,
-            'weekly': 52 * (hours_per_day / 24),
-            'daily': trading_days,
-            '4hourly': trading_days * hours_per_day / 4,
-            'hourly': trading_days * hours_per_day,
-            '30min': trading_days * hours_per_day * 2,
-            '15min': trading_days * hours_per_day * 4,
-            '5min': trading_days * hours_per_day * 12,
-            '1min': trading_days * hours_per_day * 60,
+            "annually": 1,
+            "semi-annually": 2,
+            "quarterly": 4,
+            "monthly": 12,
+            "weekly": 52 * (hours_per_day / 24),
+            "daily": trading_days,
+            "4hourly": trading_days * hours_per_day / 4,
+            "hourly": trading_days * hours_per_day,
+            "30min": trading_days * hours_per_day * 2,
+            "15min": trading_days * hours_per_day * 4,
+            "5min": trading_days * hours_per_day * 12,
+            "1min": trading_days * hours_per_day * 60,
         }.get(period.lower(), "Invalid period. Please choose a valid period")
 
-    def annualized_return(self, period='daily', trading_days=252, hours_per_day=8):
+    def annualized_return(self, period="daily", trading_days=252, hours_per_day=8):
         """
         Calculate the annualized returns of the time series data.
 
@@ -146,9 +167,11 @@ class Timeseries:
         periods = self.periods_in_year(period, trading_days, hours_per_day)
         if isinstance(periods, str):
             raise ValueError(periods)
-        return self.prices.pct_change().mean() * periods
 
-    def annualized_volatility(self, period='daily', trading_days=252, hours_per_day=8):
+        daily_returns = self.returns().mean()
+        return (1 + daily_returns) ** periods - 1
+
+    def annualized_volatility(self, period="daily", trading_days=252, hours_per_day=8):
         """ 
         Calculates the annualized volatility of the financial data.
 
@@ -176,7 +199,10 @@ class Timeseries:
         periods = self.periods_in_year(period, trading_days, hours_per_day)
         if isinstance(periods, str):
             raise ValueError(periods)
-        return self.prices.pct_change().std(ddof=1) * np.sqrt(periods)
+        
+        returns = self.returns()
+
+        return returns.std(ddof=1) * np.sqrt(periods)
 
     def compound_return(self):
         """
@@ -189,6 +215,18 @@ class Timeseries:
         """
         returns = self.returns()
         return np.expm1(np.log1p(returns).sum())
+    
+    def cumulative_returns(self):
+        """
+        Calculates and returns the cumulative return of the time series data.
+
+        Returns
+        -------
+        pd.DataFrame
+            The cumulative return of each column in the time series data.
+        """
+        returns = self.returns()
+        return (1 + returns).cumprod() - 1
     
     def max_drawdown(self):
         """
@@ -206,7 +244,7 @@ class Timeseries:
         max_drawdowns = {}
 
         for col, df in drawdown.items():
-            max_drawdowns[col] = df['drawdowns'].min()
+            max_drawdowns[col] = df["drawdowns"].min()
 
         return pd.Series(max_drawdowns)
     
@@ -223,19 +261,16 @@ class Timeseries:
             A dictionary where keys are column names and the values are dataframes containing columns: 
             'Returns', 'Cumulative Returns', 'Running Max', and 'Drawdowns'.
         """
-        return_series = self.returns()
-        cumulative_returns = (1 + return_series).cumprod()
-        running_max = cumulative_returns.cummax()
-        drawdown = (cumulative_returns) / running_max - 1.0
+        returns = self.returns()
+        cumulative_returns = (1 + returns).cumprod()
+        running_max = cumulative_returns.expanding().max()
+        drawdown = cumulative_returns.divide(running_max) - 1.0
 
         return {
             col: pd.DataFrame({
-                'returns': return_series[col],
-                'cumulative_returns': cumulative_returns[col],
-                'running_max': running_max[col],
-                'drawdowns': drawdown[col]
+                "drawdowns": drawdown[col]
             })
-            for col in return_series.columns
+            for col in cumulative_returns.columns
         }
 
     def skewness(self):
@@ -313,9 +348,8 @@ class Timeseries:
 
         return pd.Series(pd_series)
 
-
     
-    def sharpe_ratio(self, period='daily', risk_free_rate=0.0, trading_days=252, hours_per_day=8):
+    def sharpe_ratio(self, risk_free_rate=0.0, period="daily", trading_days=252, hours_per_day=8):
         """
         Calculates and returns the Sharpe ratio of the time series data.
 
@@ -323,11 +357,11 @@ class Timeseries:
 
         Parameters
         ----------
+        risk_free_rate : float, optional
+            The risk-free rate of return (default is 0.0).
         period : str, optional
             The granularity of the time period (default is 'daily'). Valid options are: 'annually', 'semi-annually', 
             'quarterly', 'monthly', 'weekly', 'daily', '4hourly', 'hourly', '30min', '15min', '5min', or '1min'.
-        risk_free_rate : float, optional
-            The risk-free rate of return (default is 0.0).
         trading_days : int, optional
             The average number of trading days in a year (default is 252).
         hours_per_day : int, optional
