@@ -1,60 +1,49 @@
-## Table of contents
+# Quant Alchemy
 
-- [Table of contents](#table-of-contents)
-- [Introduction](#introduction)
-- [Installation](#installation)
-  - [Dependencies](#dependencies)
-- [Usage](#usage)
-- [Contributing](#contributing)
+Python source for **time-series statistics and portfolio calculations** using pandas, NumPy, and SciPy. The package exports `Timeseries` and `Portfolio`.
 
-## Introduction
-`Quant Alchemy` provide a
+## Use the source checkout
 
+Clone the repository and run examples from its root so Python imports the local `quant_alchemy` directory. There is no `setup.py` or `pyproject.toml` in this tree, so `pip install .` is not a supported source-install command.
 
-## Installation
-This package requires some dependencies to be installed.
+The core source imports pandas, NumPy, and SciPy:
 
-### Dependencies
-- [pandas](https://pandas.pydata.org/)
-- [numpy](https://numpy.org/)
-- [scipy](https://www.scipy.org/)
-
-To install the package, run the following command in your terminal.
-
-```bash
-pip install quant_alchemy
+```sh
+python -m pip install numpy pandas scipy
 ```
 
-To install all the dependencies, run the following command in your terminal.
+This installs available dependencies rather than recreating a pinned historical environment. [requirements.txt](requirements.txt) pins older versions of those libraries and also includes `quant_alchemy>=0.1.7`, which installs a separately distributed package. A package-index release and this source checkout should not be assumed identical.
 
-```bash
-pip install -r requirements.txt
-```
-
-## Usage
-A simple example of how to use the package is shown below.
+## Minimal example
 
 ```python
+import pandas as pd
 from quant_alchemy import Timeseries, Portfolio
-"""
-Suppose we have a dataframe with the following columns:
-    - date: date of the stock price
-    - close: opening price of the stock
-"""
-df = pd.read_csv("data/stock.csv")
 
-# Create a timeseries object
-ts = Timeseries(df)
+prices = pd.DataFrame({
+    "asset_a": [100.0, 102.0, 101.0, 104.0],
+    "asset_b": [50.0, 51.0, 52.0, 51.5],
+}, index=pd.date_range("2024-01-01", periods=4))
 
-# To see all the methods available
-print([t for t in dir(ts) if not t.startswith('__')])
+series = Timeseries(prices)
+print(series.returns())
+print(series.volatility())
 
-# To see how to use a method
-help(ts.annualized_return)
+portfolio = Portfolio(series)
+print(portfolio.correlation_matrix())
+print(portfolio.returns(weights=[0.5, 0.5]))
 ```
 
-## Contributing
+Use numeric price columns, ordered consistently in time. Do not pass a date column as if it were another asset. Return calculations drop missing results from the initial shift; input cleanup and sampling frequency remain the caller's responsibility.
 
-For any bug reports or recommendations, please visit our [issue tracker](https://github.com/EladioRocha/quant_alchemy/issues) and create a new issue. If you're reporting a bug, it would be great if you can provide a minimal reproducible example.
+## API map
 
-Thank you for your contribution!
+- [quant_alchemy/timeseries.py](quant_alchemy/timeseries.py): returns, volatility, annualization, distribution statistics, and related metrics.
+- [quant_alchemy/portfolio.py](quant_alchemy/portfolio.py): portfolio returns, covariance, correlation, weights, and optimization helpers.
+- [quant_alchemy/__init__.py](quant_alchemy/__init__.py): public imports.
+
+Use `help(Timeseries.annualized_return)` or `help(Portfolio.returns)` to inspect signatures and assumptions. In the current implementation, `annualized_return()` compounds the mean periodic return; it is not a date-aware CAGR calculation.
+
+## Validation and contributions
+
+There is no automated test suite or documented numerical benchmark. The small example is intended to verify imports and basic calculations, not validate every metric or optimizer. When reporting a calculation issue, include a minimal price table, sampling frequency, expected result, and package versions in the [issue tracker](https://github.com/EladioRocha/quant-alchemy/issues).
